@@ -188,6 +188,7 @@ function ServerTable({
               <th className="px-4 py-3 font-medium">Disco</th>
               <th className="px-4 py-3 font-medium">Última comunicação</th>
               <th className="px-4 py-3 font-medium">Agente</th>
+              <th className="px-4 py-3 text-right font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -201,7 +202,8 @@ function ServerTable({
                   <td className="px-4 py-3">
                     <Link
                       to={`/servers/${server.id}`}
-                      className="focus-ring rounded font-medium text-slate-100 hover:text-emerald-300"
+                      title={`Abrir detalhes de ${server.name}`}
+                      className="focus-ring rounded font-medium text-slate-100 underline decoration-slate-700 underline-offset-4 hover:text-emerald-300 hover:decoration-emerald-400"
                     >
                       {server.name}
                     </Link>
@@ -226,6 +228,14 @@ function ServerTable({
                   </td>
                   <td className="px-4 py-3 text-slate-500">
                     {server.agent_version ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      to={`/servers/${server.id}`}
+                      className="focus-ring inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 transition hover:border-emerald-500/50 hover:text-emerald-300"
+                    >
+                      Abrir →
+                    </Link>
                   </td>
                 </tr>
               );
