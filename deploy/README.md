@@ -11,6 +11,45 @@ Em ambos, os segredos vivem apenas no `.env` do servidor — nunca no Git.
 
 ---
 
+## 0. Antes de tudo: qual tipo de serviço no Easypanel?
+
+O Easypanel oferece dois jeitos de publicar a aplicação. A escolha muda **onde** o
+Dockerfile e o banco ficam:
+
+### 0.1 Serviço do tipo "Compose" (recomendado para o modo A)
+
+1. No Easypanel: **Create Service → Compose**.
+2. Cole o conteúdo de `docker-compose.yml` (raiz do repositório).
+3. Em **Environment**, cole as variáveis do `.env` (seção 2 abaixo). O Easypanel
+   injeta essas variáveis no processo do compose, então `${MYSQL_ROOT_PASSWORD}` e
+   `env_file: .env` funcionam.
+4. Deploy. O Easypanel constrói `api` e `mysql` e sobe a stack inteira.
+
+Se o seu Easypanel **não** cria o arquivo `.env`, use o modo B (0.2) — ele não depende
+de arquivo de ambiente, só de variáveis no painel.
+
+### 0.2 Serviço do tipo "App" (Dockerfile) — modo B
+
+1. No Easypanel: **Create Service → App**.
+2. **Source:** repositório `michaeljcfspb/vps-guardian`, branch `main`.
+3. **Build:**
+   - **Build Path / Root Directory:** deixe **vazio** (raiz do repositório) — o
+     `Dockerfile` agora está na raiz.
+   - **Dockerfile:** `Dockerfile`.
+4. **Port:** `8000` (porta interna da API).
+5. **Environment:** variáveis da seção 2, com `GUARDIAN_DATABASE_URL` ou
+   `GUARDIAN_DB_*` apontando para o MySQL do Easypanel (serviço **MySQL** criado
+   separadamente, na mesma rede privada).
+6. **Deploy**.
+
+> **Erro `failed to read dockerfile: open Dockerfile: no such file or directory`**
+> O EasyPanel usa por padrão o `Dockerfile` na raiz do repositório. Até o commit
+> anterior, o arquivo ficava em `backend/Dockerfile`. Agora ele está na **raiz**:
+> configure Build Path vazio e Dockerfile `Dockerfile`. Se você já criou o serviço
+> apontando para `backend`, mude o Build Path para vazio (ou recrie o serviço).
+
+---
+
 ## 1. Pré-requisitos
 
 | Item | Requisito |

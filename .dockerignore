@@ -1,10 +1,20 @@
 .git
 .gitignore
+.gitattributes
 .github
+.editorconfig
 docs
+deploy
+agent
+frontend
+docker-compose.yml
+docker-compose.external-db.yml
+env
 **/__pycache__
 **/*.pyc
 **/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
 **/node_modules
 **/dist
 **/.venv
@@ -13,3 +23,4 @@ docs
 !**/.env.example
 backend/tests
 *.md
+*.sql

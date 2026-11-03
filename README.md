@@ -37,13 +37,14 @@ Testes automatizados vivem no repositório e são executados:
 ## Estrutura
 
 ```
+Dockerfile                      imagem da API (contexto de build = raiz do repo)
 docker-compose.yml              stack completo: MySQL 8 + API + migrations automáticas
 docker-compose.external-db.yml  API usando o MySQL já existente do Easypanel
 .env.example                    modelo de variáveis (copiar para .env na VPS)
 backend/                        API FastAPI, modelos, migrations, testes
 deploy/                         bootstrap/seed MySQL e guia de instalação
 docs/                           arquitetura, decisões (ADRs), relatórios de fase
-agent/                          agente Linux (fase 4+)
+agent/                          agente Linux (coleta de métricas)
 frontend/                       painel React (fase 7+)
 ```
 

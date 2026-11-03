@@ -69,7 +69,7 @@
 | Arquivo | Finalidade |
 |---|---|
 | `backend/pyproject.toml` | Dependências fixadas, marcadores de teste, configuração do ruff |
-| `backend/Dockerfile` | Imagem única (API/migrations) com usuário sem privilégios |
+| `Dockerfile` (raiz) | Imagem única (API/migrations) com usuário sem privilégios |
 | `backend/alembic.ini`, `alembic/env.py`, `alembic/script.py.mako` | Migrations lendo URL do ambiente |
 | `backend/alembic/versions/0001_initial.py` | 7 tabelas, 14 índices, 5 FKs, JSON nativo |
 | `app/core/config.py` | Configuração tipada com validações de segurança |

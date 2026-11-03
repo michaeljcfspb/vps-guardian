@@ -13,7 +13,7 @@ name: vps-guardian
 services:
   api:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     image: vps-guardian/api:0.1.0
     restart: unless-stopped
@@ -55,7 +55,7 @@ services:
 
   migrations:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     image: vps-guardian/api:0.1.0
     profiles: ["tools"]
