@@ -1,146 +1,231 @@
 # Deploy da central — Easypanel + MySQL
 
-Guia operacional da **fase 2/3** (fundação + cadastro de servidores). Cobre o que já
-existe no repositório; itens de fases futuras estão marcados como tal.
+Dois modos de instalação. Escolha **um**:
 
-> **Regra de ouro:** nenhum segredo em arquivo versionado. Senhas, `GUARDIAN_SECRET_KEY`
-> e tokens vivem no gerenciador de segredos do Easypanel ou em `.env` local não versionado.
+| Modo | Quando usar | Arquivo |
+|---|---|---|
+| **A. Stack completo** (recomendado para começar) | a VPS não tem MySQL, ou você quer o banco no mesmo compose | `docker-compose.yml` |
+| **B. MySQL do Easypanel** | já existe um serviço MySQL gerenciado, com backup próprio | `docker-compose.external-db.yml` |
+
+Em ambos, os segredos vivem apenas no `.env` do servidor — nunca no Git.
+
+---
 
 ## 1. Pré-requisitos
 
 | Item | Requisito |
 |---|---|
-| MySQL | **8.0+** (JSON nativo, colunas geradas, `SKIP LOCKED` futuro) |
-| Acesso ao MySQL | rede privada interna; **porta 3306 nunca publicada** |
-| Domínio | apontando para o proxy do Easypanel, com TLS (Let's Encrypt) |
-| Docker | host da central com Docker/Compose (o Easypanel já fornece) |
+| Docker | 24+ com Compose v2 |
+| MySQL | 8.0+ (o modo A já sobe a versão 8.0) |
+| Domínio | apontando para o proxy do Easypanel (para TLS) |
+| Portas | apenas 80/443 públicas; **3306 nunca exposta** |
 
-## 2. Banco de dados
+---
 
-Execute como administrador do MySQL (não como usuário da aplicação):
+## 2. Modo A — stack completo (sobe o MySQL junto)
+
+### 2.1 Preparar o ambiente
+
+```bash
+git clone https://github.com/michaeljcfspb/vps-guardian.git
+cd vps-guardian
+cp .env.example .env
+```
+
+Gere os segredos:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # GUARDIAN_SECRET_KEY
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"   # GUARDIAN_DB_PASSWORD
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"   # MYSQL_ROOT_PASSWORD
+```
+
+Edite o `.env` e preencha os quatro valores obrigatórios:
+
+| Variável | O que é |
+|---|---|
+| `GUARDIAN_SECRET_KEY` | chave de sessão/criptografia (≥ 32 caracteres) |
+| `MYSQL_ROOT_PASSWORD` | senha do root do MySQL (interna ao container) |
+| `GUARDIAN_DB_PASSWORD` | senha do usuário da aplicação (diferente da root) |
+| `GUARDIAN_PUBLIC_BASE_URL` | `https://guardian.seudominio.com` (opcional, mas recomendado) |
+
+`GUARDIAN_DB_NAME` e `GUARDIAN_DB_USER` já vêm prontos (`vps_guardian` / `guardian`).
+
+### 2.2 Subir tudo
+
+```bash
+docker compose up -d --build
+```
+
+A sequência é automática:
+
+1. `mysql` inicia (InnoDB, `utf8mb4`) e passa no healthcheck;
+2. `api` espera o banco responder (`app.cli wait-db`);
+3. `api` executa `alembic upgrade head` (cria as 7 tabelas);
+4. só então o Uvicorn começa a aceitar conexões.
+
+Acompanhe:
+
+```bash
+docker compose ps
+docker compose logs -f api
+```
+
+Procure por `guardian: schema atualizado; iniciando aplicação.`
+
+### 2.3 Verificar
+
+```bash
+curl -fsS http://127.0.0.1:8000/health          # via túnel local ou pelo proxy
+curl -fsS https://guardian.seudominio.com/health/ready
+```
+
+`/health/ready` deve retornar `"status":"ready"` e `"schema_revision":"0001_initial"`.
+
+### 2.4 Criar o administrador
+
+```bash
+docker compose exec api python -m app.cli create-admin \
+  --email admin@seudominio.com --name "Administrador"
+```
+
+A senha é digitada no terminal (mínimo 12 caracteres). Em automação, defina
+`GUARDIAN_ADMIN_PASSWORD` antes do comando — nunca passe a senha como argumento.
+
+### 2.5 Onde ficam os dados
+
+- Banco: volume Docker `vps-guardian_mysql_data`;
+- Nada sensível no repositório.
+
+```bash
+docker compose exec mysql \
+  mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW TABLES FROM vps_guardian;"
+```
+
+### 2.6 Expor a API com TLS
+
+No Easypanel, crie o domínio apontando para a porta interna **8000** do serviço `api`
+(o container publica apenas em `expose`, não em portas do host). O TLS é terminado pelo
+proxy do Easypanel (Let's Encrypt).
+
+Depois de definir o domínio, preencha no `.env`:
+
+```
+GUARDIAN_PUBLIC_BASE_URL=https://guardian.seudominio.com
+GUARDIAN_TRUSTED_PROXY_IPS=<IP interno do proxy>
+GUARDIAN_CORS_ORIGINS=https://guardian.seudominio.com   # só se o painel for outro host
+```
+
+`GUARDIAN_TRUSTED_PROXY_IPS` é o que faz a auditoria registrar o IP real do cliente em
+vez do IP do proxy.
+
+---
+
+## 3. Modo B — MySQL já existente no Easypanel
+
+### 3.1 Criar banco e usuário
 
 ```bash
 mysql -h <host-interno> -u root -p < deploy/mysql/bootstrap.sql
 ```
 
-Antes de executar, troque `TROCAR_POR_SENHA_FORTE` no arquivo por uma senha forte.
-Guarde a senha no gerenciador de segredos do Easypanel — ela será usada apenas em
-`GUARDIAN_DATABASE_URL`.
+Antes, troque `TROCAR_POR_SENHA_FORTE` no arquivo. A saída deve mostrar MySQL ≥ 8.0 e
+`SHOW GRANTS` sem privilégios globais.
 
-Verificações que devem aparecer na saída:
+### 3.2 Apontar a aplicação
 
-- `mysql_version` ≥ 8.0;
-- `charset = utf8mb4`;
-- `SHOW GRANTS` sem privilégios globais (sem `SUPER`, `FILE`, `GRANT OPTION`).
+No `.env`, ajuste o bloco de conexão:
 
-### Banco de testes (opcional, recomendado)
-
-Crie também `vps_guardian_test` com o mesmo usuário e defina
-`GUARDIAN_TEST_DATABASE_URL` no ambiente de CI/VPS. Sem essa variável, os testes de
-integração são *skipped* (nunca aprovados por omissão — ADR-0001).
-
-## 3. Variáveis de ambiente
-
-Copie `.env.example` (raiz do repositório) para `deploy/.env` **no servidor** e ajuste:
-
-| Variável | Obrigatória | Observação |
-|---|---|---|
-| `GUARDIAN_SECRET_KEY` | sim | gere com `python -c "import secrets;print(secrets.token_urlsafe(48))"` |
-| `GUARDIAN_DATABASE_URL` | sim | `mysql+pymysql://guardian:SENHA@host-interno:3306/vps_guardian` |
-| `GUARDIAN_APP_ENV` | sim | `production` |
-| `GUARDIAN_PUBLIC_BASE_URL` | recomendado | `https://guardian.seudominio.com` |
-| `GUARDIAN_TRUSTED_PROXY_IPS` | recomendado | IP do proxy/Traefik (para auditoria de IP real) |
-| `GUARDIAN_CORS_ORIGINS` | se SPA em outro domínio | sem barra final |
-
-`GUARDIAN_SECRET_KEY` trocada invalida todas as sessões ativas.
-
-## 4. Publicar a aplicação
-
-```bash
-cd deploy
-docker compose build
-docker compose run --rm migrations      # aplica o schema (alembic upgrade head)
-docker compose up -d api
+```
+GUARDIAN_DB_HOST=<host-interno-do-mysql>
+GUARDIAN_DB_PORT=3306
+GUARDIAN_DB_NAME=vps_guardian
+GUARDIAN_DB_USER=guardian
+GUARDIAN_DB_PASSWORD=<senha-definida-no-bootstrap>
 ```
 
-Verificações:
+### 3.3 Subir
 
 ```bash
-curl -fsS https://guardian.seudominio.com/health
-curl -fsS https://guardian.seudominio.com/health/ready
+docker compose -f docker-compose.external-db.yml up -d --build
 ```
 
-`/health/ready` deve retornar `status=ready` e `schema_revision=0001_initial`.
-Se retornar 503, o MySQL não está acessível pela rede privada.
+Migrations continuam automáticas no boot da API.
 
-### Criar o administrador inicial
+---
 
-```bash
-docker compose run --rm api python -m app.cli create-admin \
-  --email admin@seudominio.com --name "Administrador"
-```
-
-A senha é solicitada interativamente (mínimo 12 caracteres) ou lida de
-`GUARDIAN_ADMIN_PASSWORD` em automação. Ela nunca é passada por argumento de linha de
-comando.
-
-## 5. Primeiros passos pela API
+## 4. Primeiros passos pela API
 
 ```bash
-# 1) login (guarda cookies de sessão e CSRF)
+# login (guarda cookie de sessão e cookie CSRF)
 curl -c cookies.txt -X POST https://guardian.seudominio.com/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"admin@seudominio.com","password":"SUA_SENHA"}'
 
 CSRF=$(grep guardian_csrf cookies.txt | awk '{print $7}')
 
-# 2) cadastrar um servidor
+# cadastrar servidor
 curl -b cookies.txt -X POST https://guardian.seudominio.com/api/v1/servers \
   -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/json' \
   -d '{"name":"VPS-01","ip_address":"203.0.113.10","panel":"easypanel","environment":"production"}'
 
-# 3) emitir token de provisionamento (exibido uma única vez)
+# emitir token de provisionamento (exibido uma única vez, vale 15 min)
 curl -b cookies.txt -X POST \
   https://guardian.seudominio.com/api/v1/servers/<SERVER_ID>/provisioning-token \
   -H "X-CSRF-Token: $CSRF"
 ```
 
-O token de provisionamento expira em 15 minutos e é de uso único. A troca por credencial
-individual é feita por `POST /api/v1/agent/register` (implementado e testado).
+---
 
-## 6. Backup e restauração
+## 5. Backup e restauração
 
-Ainda **não automatizado** (fase 11). Procedimento mínimo esperado:
+Ainda **não automatizado** (fase 11). Procedimento mínimo:
 
 ```bash
-# backup cifrado (exemplo; ajuste credenciais por variável de ambiente)
-mysqldump --single-transaction --routines --triggers \
-  -h <host> -u guardian -p vps_guardian | gzip | \
-  openssl enc -aes-256-cbc -salt -pbkdf2 -out backup-$(date +%F).sql.gz.enc
+# modo A: dump de dentro do container (sem expor porta)
+docker compose exec mysql sh -c \
+  'exec mysqldump --single-transaction --routines --triggers -u root -p"$MYSQL_ROOT_PASSWORD" vps_guardian' \
+  | gzip > backup-$(date +%F).sql.gz
 
-# restauração (testar em banco separado, nunca em produção)
-openssl enc -d -aes-256-cbc -pbkdf2 -in backup.sql.gz.enc | gunzip | mysql -h <host> -u root -p vps_guardian_restore
+# cifrar o arquivo antes de sair do servidor
+openssl enc -aes-256-cbc -salt -pbkdf2 -in backup-$(date +%F).sql.gz \
+  -out backup-$(date +%F).sql.gz.enc
+
+# teste de restauração (banco separado, nunca em produção)
+gunzip -c backup-2026-11-03.sql.gz | docker compose exec -T mysql \
+  sh -c 'exec mysql -u root -p"$MYSQL_ROOT_PASSWORD" vps_guardian_restore'
 ```
 
-O teste real de restauração é critério de aceite da fase 11 e será registrado no
-relatório daquela fase.
+---
 
-## 7. Rollback
+## 6. Operação e rollback
 
-- **Código:** `docker compose up -d api` com a tag de imagem anterior
-  (`vps-guardian/api:<versão>`).
-- **Schema:** `alembic downgrade -1` dentro do serviço `migrations`. Use apenas se a
-  versão anterior do código for compatível — migrations destrutivas exigem backup
-  prévio.
+| Ação | Comando |
+|---|---|
+| Ver estado | `docker compose ps` |
+| Logs da API | `docker compose logs -f api` |
+| Reiniciar API | `docker compose restart api` |
+| Aplicar migrations manualmente | `docker compose run --rm migrations` |
+| Parar tudo (mantém dados) | `docker compose down` |
+| Recriar schema do zero | `docker compose down -v` (⚠ apaga o banco) |
 
-## 8. Solução de problemas
+**Rollback de código:** `docker compose up -d` com a tag de imagem anterior
+(`vps-guardian/api:<versão>`).
+**Rollback de schema:** `docker compose run --rm migrations alembic downgrade -1`
+(somente com backup e compatibilidade de código garantida).
+
+---
+
+## 7. Solução de problemas
 
 | Sintoma | Causa provável | Ação |
 |---|---|---|
-| `/health/ready` = 503 | MySQL inacessível/rede privada | testar `mysql -h <host>` do container da API |
-| `schema_revision` nulo | migrations não aplicadas | `docker compose run --rm migrations` |
-| 403 em rotas de escrita | header `X-CSRF-Token` ausente | reenviar valor do cookie `guardian_csrf` |
-| 429 no login | rate limit (5 tentativas / 5 min) | aguardar a janela ou reiniciar a API |
-| container reinicia em loop | variável obrigatória ausente | `docker compose logs api` |
+| `defina MYSQL_ROOT_PASSWORD no .env` | `.env` ausente/incompleto | `cp .env.example .env` e preencher |
+| `api` reinicia em loop | MySQL não subiu | `docker compose logs mysql` |
+| `/health/ready` = 503 | banco inacessível | conferir `GUARDIAN_DB_*` e a rede |
+| `schema_revision` nulo | migration não aplicada | `docker compose run --rm migrations` |
+| 403 em rotas de escrita | header `X-CSRF-Token` ausente | reenviar o valor do cookie `guardian_csrf` |
+| 429 no login | rate limit (5 tentativas / 5 min) | aguardar a janela |
+| `Cannot connect to Docker daemon` | Docker parado | iniciar Docker/Easypanel |
 
-Logs são JSON estruturado com `request_id`; segredos são redigidos automaticamente.
+Logs da aplicação são JSON com `request_id`; segredos são redigidos automaticamente.

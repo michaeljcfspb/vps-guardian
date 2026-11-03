@@ -1,0 +1,128 @@
+# VPS Guardian — stack completo (API + MySQL 8) para Easypanel/VPS
+#
+# Uso na VPS:
+#   1. cp .env.example .env   e preencha os valores (veja comentários no arquivo)
+#   2. docker compose up -d --build
+#   3. docker compose logs -f api
+#
+# O que acontece ao subir:
+#   - o MySQL 8.0 inicia e fica saudável (healthcheck);
+#   - a API espera o banco (entrypoint) e aplica `alembic upgrade head`;
+#   - a API só começa a responder depois do schema pronto.
+#
+# MySQL NÃO publica porta: o acesso é apenas pela rede interna do compose.
+# Para usar o MySQL já existente do Easypanel, use docker-compose.external-db.yml.
+
+name: vps-guardian
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD no .env}
+      MYSQL_DATABASE: ${GUARDIAN_DB_NAME:-vps_guardian}
+      MYSQL_USER: ${GUARDIAN_DB_USER:-guardian}
+      MYSQL_PASSWORD: ${GUARDIAN_DB_PASSWORD:?defina GUARDIAN_DB_PASSWORD no .env}
+      TZ: UTC
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - guardian
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: vps-guardian/api:0.1.0
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Fixado aqui: dentro do compose o MySQL é sempre o serviço `mysql`.
+      GUARDIAN_APP_ENV: production
+      GUARDIAN_DB_HOST: mysql
+      GUARDIAN_DB_PORT: "3306"
+      # Ignora uma URL externa que tenha ficado no .env (modo stack completo).
+      GUARDIAN_DATABASE_URL: ""
+      GUARDIAN_AUTO_MIGRATE: "true"
+      # Não entregar a senha de root do banco ao container da aplicação.
+      MYSQL_ROOT_PASSWORD: ""
+    depends_on:
+      mysql:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import urllib.request, sys
+          try:
+              with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as r:
+                  sys.exit(0 if r.status == 200 else 1)
+          except Exception:
+              sys.exit(1)
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - guardian
+
+  # Execução manual de migrations (sem auto-migrate). Ex.:
+  #   docker compose run --rm migrations
+  migrations:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: vps-guardian/api:0.1.0
+    profiles: ["tools"]
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      GUARDIAN_DATABASE_URL: ""
+      GUARDIAN_DB_HOST: mysql
+      GUARDIAN_DB_PORT: "3306"
+      GUARDIAN_AUTO_MIGRATE: "false"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - guardian
+
+volumes:
+  mysql_data:
+
+networks:
+  guardian:
+    driver: bridge

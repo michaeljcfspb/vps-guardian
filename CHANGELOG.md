@@ -15,6 +15,13 @@ versionamento semântico.
   double-submit, rate limiting e auditoria de tentativas.
 - Cadastro de servidores, emissão de token de provisionamento de uso único,
   registro de agente e rotação/revogação de credenciais.
+- Instalação em um comando: `docker-compose.yml` sobe **MySQL 8 + API**, com
+  healthcheck, espera do banco e `alembic upgrade head` automáticos no boot.
+- Variante `docker-compose.external-db.yml` para usar o MySQL já existente do Easypanel.
+- `.env.example` único na raiz, com os quatro valores obrigatórios marcados.
+- Conexão por partes (`GUARDIAN_DB_*`) com URL-encoding automático da senha, evitando
+  falha de instalação quando a senha contém `@`, `#`, `/` ou `:`.
+- CLI: comandos `check`, `wait-db` e `create-admin`.
 - Arquivos de deploy para Easypanel + MySQL e bootstrap de banco.
 - Suíte de testes de unidade e integração (integração exige MySQL real).
 

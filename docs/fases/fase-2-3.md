@@ -109,12 +109,15 @@
 
 | Arquivo | Finalidade |
 |---|---|
-| `deploy/docker-compose.yml` | API + job de migrations (MySQL externo, rede privada) |
-| `deploy/mysql/bootstrap.sql` | Banco e usuário com privilégio mínimo |
+| `docker-compose.yml` (raiz) | Stack completo: MySQL 8 + API, com migrations automáticas |
+| `docker-compose.external-db.yml` (raiz) | API usando o MySQL existente do Easypanel |
+| `backend/docker-entrypoint.sh` | Espera o MySQL e aplica `alembic upgrade head` no boot |
+| `.env.example` (raiz) | Modelo único de variáveis, com obrigatórias marcadas |
+| `deploy/mysql/bootstrap.sql` | Banco e usuário com privilégio mínimo (modo externo) |
 | `deploy/mysql/seed-test.sql` | **Dados fictícios** de homologação (sem credenciais) |
 | `deploy/README.md` | Passo a passo de instalação, verificação e rollback |
 | `docs/arquitetura.md`, `docs/decisoes.md`, `docs/fase-0/diagnostico-tecnico.md` | Arquitetura, ADRs e diagnóstico |
-| `README.md`, `CHANGELOG.md`, `.env.example`, `.gitignore` | Documentação e higiene do repositório |
+| `README.md`, `CHANGELOG.md`, `.gitignore` | Documentação e higiene do repositório |
 
 ## 3. Arquivos modificados
 

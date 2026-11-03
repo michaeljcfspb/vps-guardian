@@ -22,8 +22,14 @@ RUN pip install --no-cache-dir .
 COPY alembic.ini ./
 COPY alembic ./alembic
 
+# Entrypoint: espera o MySQL e roda `alembic upgrade head` antes de iniciar.
+# Permite subir a stack inteira com `docker compose up -d` e já ter o schema pronto.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
+
 USER guardian
 EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # --workers 1: o rate limiting em memória exige instância única (ADR-0006).
 # --proxy-headers: o TLS termina no Traefik do Easypanel.

@@ -67,8 +67,18 @@ Um token de agente **nunca** é aceito em rotas do painel e vice-versa.
 |---|---|---|
 | `guardian-api` | 8000 | via Traefik, HTTPS |
 | `guardian-frontend` | 80 | via Traefik, HTTPS |
-| MySQL | 3306 | **somente rede privada** |
+| `guardian-mysql` (opcional) | 3306 | **somente rede interna do compose** |
 | `guardian-worker` | — | sem porta |
+
+Dois modos de implantação, ambos com migrations automáticas no boot:
+
+1. **Stack completo** (`docker-compose.yml`) — MySQL 8 no próprio compose, volume
+   `mysql_data`, sem porta publicada. É o modo padrão e o mais rápido de subir.
+2. **MySQL do Easypanel** (`docker-compose.external-db.yml`) — apenas API e job de
+   migrations, apontando para o banco gerenciado via rede privada.
+
+O entrypoint da API executa `wait-db` e `alembic upgrade head` antes de iniciar o
+Uvicorn, garantindo que o schema exista antes da primeira requisição.
 
 ## 6. Modelo de dados (evolução)
 

@@ -1,20 +1,19 @@
-# VPS Guardian — serviços da central (Easypanel)
+# VPS Guardian — API apenas, usando o MySQL JÁ EXISTENTE do Easypanel
 #
-# MySQL NÃO está neste compose: o banco é o serviço MySQL do Easypanel, acessível pela
-# rede privada do projeto (PRD §8.2, §17.2.8). Nunca publique a porta 3306.
+# Use quando o banco é um serviço MySQL gerenciado pelo Easypanel (rede privada).
+# No .env, preencha GUARDIAN_DB_HOST / PORT / NAME / USER / PASSWORD com os dados
+# internos do serviço (ou GUARDIAN_DATABASE_URL completa).
 #
-# Uso:
-#   docker compose -f docker-compose.yml run --rm migrations
-#   docker compose -f docker-compose.yml up -d api
+#   docker compose -f docker-compose.external-db.yml up -d --build
 #
-# As variáveis vêm de um arquivo .env NÃO versionado (veja .env.example na raiz).
+# Nenhum MySQL é criado por este arquivo.
 
 name: vps-guardian
 
 services:
   api:
     build:
-      context: ../backend
+      context: ./backend
       dockerfile: Dockerfile
     image: vps-guardian/api:0.1.0
     restart: unless-stopped
@@ -22,7 +21,9 @@ services:
       - .env
     environment:
       GUARDIAN_APP_ENV: production
-      GUARDIAN_LOG_JSON: "true"
+      GUARDIAN_AUTO_MIGRATE: "true"
+      # Não entregar a senha de root do banco ao container da aplicação.
+      MYSQL_ROOT_PASSWORD: ""
     expose:
       - "8000"
     healthcheck:
@@ -40,7 +41,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 40s
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -52,10 +53,9 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # Job de migração: executa uma vez e encerra. Rode antes de subir a API.
   migrations:
     build:
-      context: ../backend
+      context: ./backend
       dockerfile: Dockerfile
     image: vps-guardian/api:0.1.0
     profiles: ["tools"]
@@ -63,16 +63,7 @@ services:
     env_file:
       - .env
     environment:
-      GUARDIAN_APP_ENV: production
+      GUARDIAN_AUTO_MIGRATE: "false"
     command: ["alembic", "upgrade", "head"]
     security_opt:
       - no-new-privileges:true
-
-  # Worker: habilitado a partir da fase 9 (alertas/fila). Mantido comentado para não
-  # sugerir funcionalidade inexistente.
-  #
-  # worker:
-  #   image: vps-guardian/api:0.1.0
-  #   command: ["python", "-m", "app.worker"]
-  #   restart: unless-stopped
-  #   env_file: [.env]

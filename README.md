@@ -37,11 +37,14 @@ Testes automatizados vivem no repositório e são executados:
 ## Estrutura
 
 ```
-backend/     API FastAPI, modelos, migrations, testes
-agent/       agente Linux (fases 4+)
-frontend/    painel React (fase 7+)
-deploy/      compose, bootstrap MySQL, seeds de teste
-docs/        arquitetura, decisões (ADRs), relatórios de fase
+docker-compose.yml              stack completo: MySQL 8 + API + migrations automáticas
+docker-compose.external-db.yml  API usando o MySQL já existente do Easypanel
+.env.example                    modelo de variáveis (copiar para .env na VPS)
+backend/                        API FastAPI, modelos, migrations, testes
+deploy/                         bootstrap/seed MySQL e guia de instalação
+docs/                           arquitetura, decisões (ADRs), relatórios de fase
+agent/                          agente Linux (fase 4+)
+frontend/                       painel React (fase 7+)
 ```
 
 ## Desenvolvimento local (opcional, sem serviços)
@@ -55,14 +58,16 @@ pytest -m unit            # apenas unidade, não precisa de banco
 
 ## Instalação na VPS (resumo)
 
-Detalhes em [`deploy/README.md`](deploy/README.md). O fluxo previsto é:
+Detalhes em [`deploy/README.md`](deploy/README.md). O fluxo é:
 
-1. Criar banco `vps_guardian` e usuário de privilégio mínimo no MySQL do Easypanel.
-2. Configurar variáveis de ambiente (`GUARDIAN_*`) no serviço do Easypanel — nunca no repositório.
-3. Publicar `guardian-api` (e, nas fases seguintes, `guardian-worker` e `guardian-frontend`).
-4. Executar o job `guardian-migrations` (`alembic upgrade head`).
-5. Criar o administrador inicial via CLI (senha fornecida na hora, nunca versionada).
-6. Instalar o agente nas VPS monitoradas, uma por vez.
+1. `cp .env.example .env` e preencher os quatro valores obrigatórios
+   (`GUARDIAN_SECRET_KEY`, `MYSQL_ROOT_PASSWORD`, `GUARDIAN_DB_PASSWORD`,
+   `GUARDIAN_PUBLIC_BASE_URL`).
+2. `docker compose up -d --build` — o MySQL sobe, a API espera o banco e aplica as
+   migrations automaticamente.
+3. Conferir `GET /health/ready` → `ready` com `schema_revision=0001_initial`.
+4. Criar o administrador: `docker compose exec api python -m app.cli create-admin ...`.
+5. Instalar o agente em cada VPS monitorada, uma por vez (fase 4).
 
 ## Segurança (resumo)
 

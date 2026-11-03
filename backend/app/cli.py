@@ -2,6 +2,7 @@
 
 Comandos:
     python -m app.cli check
+    python -m app.cli wait-db --timeout 180
     python -m app.cli create-admin --email admin@exemplo.com --name "Administrador"
 
 A senha do administrador **nunca** é aceita como argumento de linha de comando
@@ -15,6 +16,7 @@ import argparse
 import getpass
 import os
 import sys
+import time
 
 from sqlalchemy import text
 
@@ -23,7 +25,7 @@ from app.core.enums import UserRole
 from app.core.errors import APIError
 from app.core.logging import configure_logging, get_logger
 from app.core.security import hash_password, utc_now
-from app.db.session import dispose_engine, session_scope
+from app.db.session import dispose_engine, ping_database, session_scope
 from app.models.user import User
 from app.services.auth import find_user_by_email
 from app.services.schema import current_schema_revision
@@ -45,6 +47,20 @@ def _read_password() -> str:
     if first != second:
         raise SystemExit("As senhas não conferem.")
     return first
+
+
+def command_wait_db(timeout_seconds: int) -> int:
+    """Aguarda o MySQL aceitar conexões (usado no boot dos containers)."""
+    deadline = time.monotonic() + timeout_seconds
+    attempt = 0
+    while time.monotonic() < deadline:
+        attempt += 1
+        if ping_database():
+            print(f"MySQL disponível após {attempt} tentativa(s).")
+            return 0
+        time.sleep(2)
+    print(f"MySQL indisponível após {timeout_seconds}s.")
+    return 1
 
 
 def command_check() -> int:
@@ -97,6 +113,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("check", help="Valida configuração e conectividade com o MySQL")
 
+    wait_db = sub.add_parser("wait-db", help="Aguarda o MySQL ficar disponível")
+    wait_db.add_argument("--timeout", type=int, default=180)
+
     admin = sub.add_parser("create-admin", help="Cria o administrador inicial")
     admin.add_argument("--email", required=True)
     admin.add_argument("--name", required=True)
@@ -111,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "check":
             return command_check()
+        if args.command == "wait-db":
+            return command_wait_db(args.timeout)
         if args.command == "create-admin":
             return command_create_admin(args.email, args.name)
     except APIError as exc:  # pragma: no cover - defensivo

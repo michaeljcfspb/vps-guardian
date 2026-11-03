@@ -85,3 +85,65 @@ def test_repr_does_not_leak_secret_or_password() -> None:
     rendered = repr(settings)
     assert "segredo-super-secreto" not in rendered
     assert "u:p@" not in rendered
+
+
+# --- URL montada a partir de partes (modo de instalação recomendado) ---------
+
+
+def build_from_parts(**overrides: object) -> Settings:
+    data = {
+        "secret_key": "s" * 40,
+        "database_url": None,
+        "db_host": "mysql",
+        "db_name": "vps_guardian",
+        "db_user": "guardian",
+        "db_password": "senha-com-caracteres@#/:",
+    }
+    data.update(overrides)
+    return Settings(_env_file=None, **data)  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+def test_database_url_is_built_from_parts() -> None:
+    settings = build_from_parts()
+    assert settings.database_url is not None
+    assert settings.database_url.startswith("mysql+pymysql://guardian:")
+    assert settings.database_url.endswith("@mysql:3306/vps_guardian")
+
+
+@pytest.mark.unit
+def test_password_special_characters_are_url_encoded() -> None:
+    settings = build_from_parts(db_password="p@ss#word/1")
+    url = settings.database_url or ""
+    # '@' e '/' da senha não podem quebrar a URL.
+    assert url.count("@") == 1
+    assert "%40" in url and "%23" in url and "%2F" in url
+    assert url.endswith("@mysql:3306/vps_guardian")
+
+
+@pytest.mark.unit
+def test_empty_database_url_falls_back_to_parts() -> None:
+    settings = build_from_parts(database_url="")
+    assert settings.database_url is not None
+    assert settings.database_url.endswith("/vps_guardian")
+
+
+@pytest.mark.unit
+def test_missing_parts_are_reported() -> None:
+    with pytest.raises(ValidationError) as exc:
+        build_from_parts(db_host=None, db_password=None)
+    message = str(exc.value)
+    assert "GUARDIAN_DB_HOST" in message
+    assert "GUARDIAN_DB_PASSWORD" in message
+
+
+@pytest.mark.unit
+def test_db_name_rejects_unsafe_identifier() -> None:
+    with pytest.raises(ValidationError):
+        build_from_parts(db_name="vps_guardian; DROP DATABASE x")
+
+
+@pytest.mark.unit
+def test_built_url_repr_hides_password() -> None:
+    settings = build_from_parts(db_password="nao-pode-vazar-123")
+    assert "nao-pode-vazar-123" not in repr(settings)

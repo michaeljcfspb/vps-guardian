@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from typing import Any, Literal
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -64,7 +64,21 @@ class Settings(BaseSettings):
     trusted_proxy_ips: list[str] = Field(default_factory=list)
 
     # --- Banco de dados ----------------------------------------------------
-    database_url: str
+    # Duas formas equivalentes de configurar a conexão:
+    #   a) GUARDIAN_DATABASE_URL (URL completa, senha precisa de URL-encoding);
+    #   b) GUARDIAN_DB_HOST/PORT/NAME/USER/PASSWORD (a URL é montada com escaping
+    #      automático — caminho recomendado, evita erro com @ # / na senha).
+    database_url: str | None = None
+    db_host: str | None = None
+    db_port: int = Field(default=3306, ge=1, le=65535)
+    db_name: str | None = None
+    db_user: str | None = None
+    db_password: SecretStr | None = None
+
+    # Automação de instalação: esperar o MySQL e aplicar migrations ao iniciar.
+    auto_migrate: bool = True
+    db_wait_timeout_seconds: int = Field(default=180, ge=10, le=1800)
+
     db_pool_size: int = Field(default=10, ge=1, le=50)
     db_max_overflow: int = Field(default=5, ge=0, le=50)
     db_pool_recycle_seconds: int = Field(default=1800, ge=60)
@@ -96,7 +110,10 @@ class Settings(BaseSettings):
 
     @field_validator("database_url")
     @classmethod
-    def _require_mysql(cls, value: str) -> str:
+    def _require_mysql(cls, value: str | None) -> str | None:
+        if value is None or value.strip() == "":
+            return None
+        value = value.strip()
         scheme = urlsplit(value).scheme.lower()
         if not scheme:
             raise ValueError("GUARDIAN_DATABASE_URL deve ser uma URL de conexão válida")
@@ -107,6 +124,15 @@ class Settings(BaseSettings):
             )
         if not scheme.startswith("mysql"):
             raise ValueError(f"Esquema de banco não suportado: {scheme}")
+        return value
+
+    @field_validator("db_name", "db_user")
+    @classmethod
+    def _safe_identifier(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9_]{1,64}", value):
+            raise ValueError("nome de banco/usuário deve conter apenas letras, números e _")
         return value
 
     @field_validator("cors_origins", mode="before")
@@ -128,6 +154,36 @@ class Settings(BaseSettings):
             if not re.match(r"^https?://[^/\s]+$", origin):
                 raise ValueError(f"Origem CORS inválida (sem path/barra final): {origin}")
         return value
+
+    @model_validator(mode="after")
+    def _resolve_database_url(self) -> Settings:
+        """Monta a URL a partir das partes quando ``GUARDIAN_DATABASE_URL`` não existe.
+
+        Isso elimina a necessidade de URL-encoding manual na senha do MySQL — fonte
+        comum de falha de instalação quando a senha contém ``@``, ``#``, ``/`` ou ``:``.
+        """
+        if self.database_url:
+            return self
+
+        parts = (
+            ("GUARDIAN_DB_HOST", self.db_host),
+            ("GUARDIAN_DB_NAME", self.db_name),
+            ("GUARDIAN_DB_USER", self.db_user),
+            ("GUARDIAN_DB_PASSWORD", self.db_password),
+        )
+        missing = [name for name, value in parts if not value]
+        if missing:
+            raise ValueError(
+                "Defina GUARDIAN_DATABASE_URL ou então: " + ", ".join(missing)
+            )
+
+        password = self.db_password.get_secret_value() if self.db_password else ""
+        url = (
+            f"mysql+pymysql://{quote_plus(self.db_user or '')}:{quote_plus(password)}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+        )
+        object.__setattr__(self, "database_url", url)
+        return self
 
     @model_validator(mode="after")
     def _check_idle_below_ttl(self) -> Settings:
@@ -162,12 +218,15 @@ class Settings(BaseSettings):
     def effective_database_url(self) -> str:
         if self.is_test and self.test_database_url:
             return self.test_database_url
+        if self.database_url is None:  # pragma: no cover - garantido pelo validator
+            raise RuntimeError("database_url não configurada")
         return self.database_url
 
     def __repr__(self) -> str:  # nunca expor o segredo em logs/tracebacks
+        host = urlsplit(self.database_url).hostname if self.database_url else None
         return (
             f"Settings(app_env={self.app_env!r}, deployment_version={self.deployment_version!r}, "
-            f"database_host={urlsplit(self.database_url).hostname!r})"
+            f"database_host={host!r})"
         )
 
 
