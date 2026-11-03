@@ -55,8 +55,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     image: vps-guardian/frontend:0.1.0
     restart: unless-stopped
     depends_on:

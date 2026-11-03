@@ -6,10 +6,8 @@
 docs
 deploy
 agent
-frontend
 docker-compose.yml
 docker-compose.external-db.yml
-env
 **/__pycache__
 **/*.pyc
 **/.pytest_cache
@@ -17,10 +15,14 @@ env
 **/*.egg-info
 **/node_modules
 **/dist
+**/.vite
 **/.venv
 **/.env
 **/.env.*
 !**/.env.example
 backend/tests
+frontend/node_modules
+frontend/dist
+frontend/.vite
 *.md
 *.sql

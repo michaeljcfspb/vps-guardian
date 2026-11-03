@@ -48,6 +48,31 @@ de arquivo de ambiente, só de variáveis no painel.
 > configure Build Path vazio e Dockerfile `Dockerfile`. Se você já criou o serviço
 > apontando para `backend`, mude o Build Path para vazio (ou recrie o serviço).
 
+### 0.3 Serviço do tipo "App" para o painel (frontend)
+
+O Easypanel **sempre usa a raiz do repositório como contexto de build** — o Build Path
+serve apenas para localizar o Dockerfile. Os dois Dockerfiles do projeto já estão
+preparados para isso (`COPY frontend/...` e `COPY backend/...`).
+
+1. **Create Service → App**
+2. Source: mesmo repositório, branch `main`.
+3. **Build Path:** `frontend`
+4. **Dockerfile:** `Dockerfile` (caminho relativo ao Build Path)
+5. **Port:** `80`
+6. **Environment** (runtime): `API_UPSTREAM=http://<nome-do-servico-da-api>:8000`
+7. **Domínio:** aponte para este serviço.
+
+Regras para `API_UPSTREAM`:
+
+- use o **endereço interno** do serviço da API (mesma rede do projeto), sem barra final;
+- **não** use `https://...:8000` — a porta 8000 é HTTP interna; TLS só existe no proxy
+  na 443;
+- se preferir usar o domínio público, use `https://api.seudominio.com` (sem `:8000`).
+
+O template `frontend/nginx.conf.template` é processado por `envsubst` no start do
+container; apenas `API_UPSTREAM` é substituída (as variáveis do próprio nginx, como
+`$host` e `$remote_addr`, são preservadas).
+
 ---
 
 ## 1. Pré-requisitos
