@@ -25,7 +25,7 @@ os.environ.setdefault("GUARDIAN_LOGIN_MAX_ATTEMPTS", "5")
 import pytest  # noqa: E402
 
 from app.api.deps import reset_limiters  # noqa: E402
-from app.core.config import Settings, get_settings  # noqa: E402
+from app.core.config import Settings, get_settings, reset_settings_cache  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -33,6 +33,14 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 @pytest.fixture(scope="session")
 def settings() -> Settings:
     return get_settings()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_settings() -> None:
+    """Isola o cache de configuração entre testes (cada teste lê o próprio ambiente)."""
+    reset_settings_cache()
+    yield
+    reset_settings_cache()
 
 
 @pytest.fixture(autouse=True)

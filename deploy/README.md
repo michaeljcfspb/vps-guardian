@@ -259,6 +259,7 @@ gunzip -c backup-2026-11-03.sql.gz | docker compose exec -T mysql \
 
 | Sintoma | Causa provável | Ação |
 |---|---|---|
+| `GUARDIAN_SECRET_KEY: obrigatório e não definido` | variável não configurada no painel | adicionar em Environment, mínimo 32 caracteres |
 | `defina MYSQL_ROOT_PASSWORD no .env` | `.env` ausente/incompleto | `cp .env.example .env` e preencher |
 | `api` reinicia em loop | MySQL não subiu | `docker compose logs mysql` |
 | `/health/ready` = 503 | banco inacessível | conferir `GUARDIAN_DB_*` e a rede |

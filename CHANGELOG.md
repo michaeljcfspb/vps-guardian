@@ -25,6 +25,15 @@ versionamento semântico.
 - Arquivos de deploy para Easypanel + MySQL e bootstrap de banco.
 - Suíte de testes de unidade e integração (integração exige MySQL real).
 
+### Corrigido
+
+- **Configuração inválida não imprime mais traceback nem valores de ambiente.** O
+  `ValidationError` do Pydantic carrega `input_value` na representação e expunha a
+  senha do MySQL nos logs. Agora o boot falha com mensagem limpa, listando apenas o
+  **nome** da variável e o problema (ex.: `GUARDIAN_SECRET_KEY: obrigatório`), com
+  código de saída 2.
+- Entrypoint orienta explicitamente quando o MySQL não responde ou a migration falha.
+
 ### Adicionado — Fase 4 (agente e telemetria)
 
 - Migration `0002_telemetry`: `agent_heartbeats`, `host_metrics`, `disk_metrics`,

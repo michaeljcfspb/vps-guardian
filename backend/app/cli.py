@@ -20,7 +20,7 @@ import time
 
 from sqlalchemy import text
 
-from app.core.config import get_settings
+from app.core.config import ConfigurationError, get_settings
 from app.core.enums import UserRole
 from app.core.errors import APIError
 from app.core.logging import configure_logging, get_logger
@@ -124,7 +124,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    settings = get_settings()
+
+    try:
+        settings = get_settings()
+    except ConfigurationError as exc:
+        # Mensagem limpa: apenas nomes de variáveis, nunca valores (PRD §11).
+        print(f"guardian: {exc.report()}", file=sys.stderr)
+        return 2
+
     configure_logging(settings)
 
     try:

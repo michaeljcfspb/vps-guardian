@@ -11,7 +11,7 @@ from functools import lru_cache
 from typing import Any, Literal
 from urllib.parse import quote_plus, urlsplit
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["development", "staging", "production", "test"]
@@ -230,9 +230,60 @@ class Settings(BaseSettings):
         )
 
 
+class ConfigurationError(Exception):
+    """Configuração ausente ou inválida, com mensagem segura para o operador.
+
+    Nunca inclui valores de variáveis de ambiente: o ``ValidationError`` do Pydantic
+    carrega ``input_value`` em sua representação, o que vazaria senhas e DSN nos logs
+    (PRD §11). Aqui expomos apenas o **nome** da variável e o problema.
+    """
+
+    def __init__(self, problems: list[str]) -> None:
+        self.problems = problems
+        super().__init__("; ".join(problems))
+
+    def report(self) -> str:
+        lines = ["configuração inválida — a aplicação não pode iniciar:"]
+        lines.extend(f"  - {problem}" for problem in self.problems)
+        lines.append("")
+        lines.append(
+            "Defina as variáveis em Environment (Easypanel) ou no arquivo .env. "
+            "Modelo completo em .env.example."
+        )
+        return "\n".join(lines)
+
+
+def _env_name(field: str) -> str:
+    return f"GUARDIAN_{field.upper()}"
+
+
+def _to_configuration_error(exc: ValidationError) -> ConfigurationError:
+    problems: list[str] = []
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error.get("loc", ())) or "?"
+        name = _env_name(location)
+        kind = error.get("type", "value_error")
+
+        if kind == "missing":
+            problems.append(f"{name}: obrigatório e não definido")
+        elif kind == "string_too_short":
+            minimum = (error.get("ctx") or {}).get("min_length", 32)
+            problems.append(f"{name}: valor muito curto (mínimo {minimum} caracteres)")
+        elif kind == "extra_forbidden":
+            problems.append(f"{name}: variável não reconhecida")
+        else:
+            problems.append(f"{name}: {error.get('msg', 'valor inválido')}")
+
+    return ConfigurationError(problems or ["erro de configuração não identificado"])
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    try:
+        return Settings()  # type: ignore[call-arg]
+    except ValidationError as exc:
+        # ``from None``: não encadear o erro original, que carrega input_value.
+        raise _to_configuration_error(exc) from None
 
 
 def reset_settings_cache() -> None:
