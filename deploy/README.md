@@ -64,10 +64,11 @@ preparados para isso (`COPY frontend/...` e `COPY backend/...`).
 
 Regras para `API_UPSTREAM`:
 
-- use o **endereço interno** do serviço da API (mesma rede do projeto), sem barra final;
-- **não** use `https://...:8000` — a porta 8000 é HTTP interna; TLS só existe no proxy
-  na 443;
-- se preferir usar o domínio público, use `https://api.seudominio.com` (sem `:8000`).
+- **preferido:** endereço interno do serviço da API (mesma rede do projeto), sem barra
+  final → `http://<nome-do-servico>:8000` (sem TLS, sem sair do host);
+- **alternativa válida:** domínio público com TLS → `https://api.seudominio.com`
+  (sem `:8000`);
+- **nunca** `https://...:8000`: a porta 8000 é HTTP interna, TLS só existe na 443.
 
 O template `frontend/nginx.conf.template` é processado por `envsubst` no start do
 container; apenas `API_UPSTREAM` é substituída (as variáveis do próprio nginx, como

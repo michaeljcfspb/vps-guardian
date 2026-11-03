@@ -26,6 +26,10 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 30s;
+
+        # Necessário quando API_UPSTREAM usa https atrás de proxy com SNI
+        # (Traefik/Easypanel). Ignorado quando o upstream é http.
+        proxy_ssl_server_name on;
     }
 
     location = /health {
