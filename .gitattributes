@@ -1,0 +1,16 @@
+# Normalização de linha: o repositório guarda LF (alvo Linux/Docker).
+* text=auto eol=lf
+
+# Scripts executados em Linux/containers precisam permanecer com LF.
+*.sh text eol=lf
+*.service text eol=lf
+Dockerfile text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binários
+*.png binary
+*.jpg binary
+*.pdf binary
+*.gz binary
