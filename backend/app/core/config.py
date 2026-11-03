@@ -53,6 +53,7 @@ class Settings(BaseSettings):
 
     # --- Segurança ---------------------------------------------------------
     secret_key: SecretStr = Field(min_length=32)
+    session_cookie_name: str = "guardian_session"
     session_ttl_minutes: int = Field(default=720, ge=5, le=10080)
     session_idle_timeout_minutes: int = Field(default=120, ge=5, le=2880)
     cookie_secure: bool | None = None
@@ -124,6 +125,15 @@ class Settings(BaseSettings):
             )
         if not scheme.startswith("mysql"):
             raise ValueError(f"Esquema de banco não suportado: {scheme}")
+        return value
+
+    @field_validator("session_cookie_name")
+    @classmethod
+    def _valid_cookie_name(cls, value: str) -> str:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value):
+            raise ValueError(
+                "GUARDIAN_SESSION_COOKIE_NAME deve conter apenas letras, números, '-' e '_'"
+            )
         return value
 
     @field_validator("db_name", "db_user")

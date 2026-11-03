@@ -27,6 +27,12 @@ versionamento semântico.
 
 ### Corrigido
 
+- **500 em todas as rotas /api (painel inutilizável).** `Settings` não declarava
+  `session_cookie_name`; a dependência de sessão levantava `AttributeError` em
+  produção. Nenhum teste cobria esse caminho porque os testes de integração ficavam
+  *skipped* sem MySQL. Adicionado o campo, validação do nome do cookie e um smoke test
+  que cria a aplicação real e exige 401 (não 500) nas rotas protegidas.
+
 - **Configuração inválida não imprime mais traceback nem valores de ambiente.** O
   `ValidationError` do Pydantic carrega `input_value` na representação e expunha a
   senha do MySQL nos logs. Agora o boot falha com mensagem limpa, listando apenas o
