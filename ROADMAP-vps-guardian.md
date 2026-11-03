@@ -296,23 +296,28 @@ para agentes.
 
 ### Tarefas
 
--   [ ] Criar pacote do agente em Python.
--   [ ] Implementar configuração local protegida.
--   [ ] Implementar coleta de CPU e load average.
--   [ ] Implementar RAM e swap.
--   [ ] Implementar uso de disco por ponto de montagem.
--   [ ] Implementar contadores e taxas de rede.
--   [ ] Implementar uptime e informações do sistema.
--   [ ] Implementar heartbeat com timestamp UTC.
--   [ ] Implementar envio HTTPS com timeout e retentativas controladas.
--   [ ] Implementar fila local limitada para interrupções temporárias.
--   [ ] Implementar logs locais com rotação.
--   [ ] Criar serviço systemd.
--   [ ] Implementar atualização/versionamento seguro do agente.
--   [ ] Implementar limite de payload e proteção contra dados inválidos.
--   [ ] Garantir que o agente não execute comandos remotos.
--   [ ] Garantir que não colete `.env`, chaves privadas, senhas ou
-    conteúdo de volumes.
+-   [x] Criar pacote do agente em Python.
+-   [x] Implementar configuração local protegida. — JSON 0600, escrita atômica
+-   [x] Implementar coleta de CPU e load average.
+-   [x] Implementar RAM e swap.
+-   [x] Implementar uso de disco por ponto de montagem.
+-   [x] Implementar contadores e taxas de rede. — estado persistido entre coletas
+-   [x] Implementar uptime e informações do sistema.
+-   [x] Implementar heartbeat com timestamp UTC.
+-   [x] Implementar envio HTTPS com timeout e retentativas controladas. —
+    backoff exponencial; 4xx não repete
+-   [x] Implementar fila local limitada para interrupções temporárias. —
+    limite por quantidade e idade
+-   [x] Implementar logs locais com rotação. — JSON, 5 MB × 3, com máscara de segredos
+-   [x] Criar serviço systemd. — usuário sem privilégios + hardening
+-   [x] Implementar atualização/versionamento seguro do agente. —
+    versão no pacote, no payload e em `/agent/config`; reinstalação idempotente
+-   [x] Implementar limite de payload e proteção contra dados inválidos. —
+    validação estrita Pydantic na central + filtro de interfaces no agente
+-   [x] Garantir que o agente não execute comandos remotos. — não há
+    subprocess/`os.system` em nenhum ponto do código
+-   [x] Garantir que não colete `.env`, chaves privadas, senhas ou
+    conteúdo de volumes. — coleta restrita a `psutil`, `/etc/os-release` e kernel
 
 ### Entregáveis
 
@@ -329,10 +334,17 @@ para agentes.
 -   [ ] Serviço se recupera de falha.
 -   [ ] Métricas recebidas correspondem às métricas locais dentro de
     tolerância.
--   [ ] Falha temporária de rede não trava o agente.
--   [ ] Credencial inválida é rejeitada.
+-   [-] Falha temporária de rede não trava o agente. — coberto por teste
+    de unidade (buffer + retry); falta a prova em host real
+-   [-] Credencial inválida é rejeitada. — coberto por teste de
+    integração (escrito, não executado)
 -   [ ] Consumo do agente é medido e documentado.
--   [ ] Nenhum comando recebido da central é executado.
+-   [x] Nenhum comando recebido da central é executado. — verificado por
+    inspeção: não existe chamada de subprocess/shell no pacote do agente
+
+> Situação em 03/11/2026: implementação concluída e validada por 55 testes
+> de unidade + coleta real (`--dry-run`). Os critérios que dependem de host
+> Ubuntu seguem **abertos** — a validação ocorre na VPS (Fase 5).
 
 ------------------------------------------------------------------------
 
@@ -649,19 +661,21 @@ este bloco:
 
 ### Estado atual
 
--   **Fase atual:** 2 e 3 --- fundação do backend e cadastro de servidores
-    (implementação concluída; aceite pendente na VPS).
--   **Última tarefa concluída:** Rotação e revogação de credenciais de agente
-    (Fase 3).
--   **Próxima tarefa:** Fase 4 --- agente Linux e telemetria (coleta e
-    migration `0002_telemetry`).
--   **Bloqueios:** MySQL do Easypanel (host, porta, versão), domínio/TLS da
-    central, escolha da VPS central e inventário das nove VPS.
--   **Testes executados:** 49 testes de unidade (`pytest -m unit`), lint
-    (`ruff`), compilação (`compileall`), OpenAPI com 19 rotas, DDL da
-    migration gerado por `alembic upgrade head --sql`.
--   **Testes aprovados:** 49 de unidade. Os 37 de integração ficaram
-    *skipped* por ausência de MySQL e **não** foram aprovados.
+-   **Fase atual:** 4 --- Agente Linux e telemetria (implementação concluída;
+    aceite em Ubuntu pendente).
+-   **Última tarefa concluída:** Ingestão idempotente de telemetria
+    (`/agent/metrics`) e pacote do agente com serviço systemd.
+-   **Próxima tarefa:** Fase 7 --- dashboard e histórico (recomendado antes
+    do piloto, para tornar a validação de 24 h observável) ou Fase 9 ---
+    motor de alertas.
+-   **Bloqueios:** MySQL do Easypanel, domínio/TLS, VPS central e
+    inventário das nove VPS — os mesmos da Fase 0.
+-   **Testes executados:** 66 testes de unidade no backend e 55 no agente,
+    lint (`ruff`) nos dois pacotes, DDL das duas migrations gerado por
+    `alembic upgrade head --sql`, OpenAPI com 20 rotas, coleta real via
+    `guardian-agent --dry-run`.
+-   **Testes aprovados:** 121 de unidade. Os 46 de integração do backend
+    ficaram *skipped* por ausência de MySQL e **não** foram aprovados.
 -   **Data da última atualização:** 03/11/2026.
 
 ### Registro de execução
@@ -681,6 +695,11 @@ este bloco:
                                 auth, cadastro (aceite       fase-2-3.md;
                                 e provisio-    pendente)      49 testes de
                                 namento                       unidade ok
+
+  03/11/2026     4              Agente Linux   Implementado   docs/fases/
+                                + telemetria   (aceite em     fase-4.md;
+                                + migration    Ubuntu         121 testes de
+                                0002_telemetry pendente)      unidade ok
 
   --------------------------------------------------------------------------
 

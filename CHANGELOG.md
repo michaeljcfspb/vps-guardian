@@ -25,6 +25,24 @@ versionamento semântico.
 - Arquivos de deploy para Easypanel + MySQL e bootstrap de banco.
 - Suíte de testes de unidade e integração (integração exige MySQL real).
 
+### Adicionado — Fase 4 (agente e telemetria)
+
+- Migration `0002_telemetry`: `agent_heartbeats`, `host_metrics`, `disk_metrics`,
+  `network_metrics`, com índices `(server_id, collected_at)`.
+- `POST /api/v1/agent/metrics` com contrato estrito e **ingestão idempotente**
+  (`UNIQUE (server_id, collected_at)`).
+- Histórico de heartbeat em `agent_heartbeats`; `features.metrics = true` no
+  `/agent/config`.
+- Agente Linux em Python 3.10+ com coleta de CPU, load, RAM, swap, disco por ponto de
+  montagem, rede com taxa calculada, uptime e processos.
+- Buffer local limitado (quantidade e idade), retry com backoff e descarte de payload
+  inválido; transporte HTTPS com TLS obrigatório.
+- Serviço `systemd` endurecido (usuário sem privilégios, `ProtectSystem=strict`,
+  sem capabilities) e instalador/desinstalador auditáveis.
+- Config local `0600` com escrita atômica; registro único troca o token de
+  provisionamento pela credencial permanente.
+- 66 testes de unidade no backend e 53 no agente.
+
 ### Decisões
 
 - ADR-0001: desenvolvimento code-first; validação funcional na VPS.

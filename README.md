@@ -65,9 +65,18 @@ Detalhes em [`deploy/README.md`](deploy/README.md). O fluxo é:
    `GUARDIAN_PUBLIC_BASE_URL`).
 2. `docker compose up -d --build` — o MySQL sobe, a API espera o banco e aplica as
    migrations automaticamente.
-3. Conferir `GET /health/ready` → `ready` com `schema_revision=0001_initial`.
+3. Conferir `GET /health/ready` → `ready` com `schema_revision=0002_telemetry`.
 4. Criar o administrador: `docker compose exec api python -m app.cli create-admin ...`.
-5. Instalar o agente em cada VPS monitorada, uma por vez (fase 4).
+5. Cadastrar a VPS, emitir o token e instalar o agente no host monitorado:
+
+```bash
+sudo bash agent/scripts/install.sh \
+  --server-id <UUID> \
+  --token <token-de-provisionamento> \
+  --api-url https://guardian.seudominio.com
+```
+
+Guia do agente: [`agent/README.md`](agent/README.md).
 
 ## Segurança (resumo)
 

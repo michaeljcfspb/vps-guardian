@@ -26,11 +26,14 @@ from app.schemas.agent import (
     AgentFeatures,
     AgentHeartbeatRequest,
     AgentHeartbeatResponse,
+    AgentMetricsRequest,
+    AgentMetricsResponse,
     AgentRegistrationRequest,
     AgentRegistrationResponse,
 )
 from app.services import provisioning as provisioning_service
 from app.services import servers as server_service
+from app.services import telemetry as telemetry_service
 from app.services.audit import record_audit
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -113,13 +116,64 @@ def heartbeat(
     server = server_service.apply_heartbeat(
         db, server=ctx.server, agent_version=payload.agent_version, now=now
     )
+    telemetry_service.record_heartbeat(
+        db,
+        server=server,
+        agent_version=payload.agent_version,
+        uptime_seconds=payload.uptime_seconds,
+        now=now,
+    )
     db.commit()
 
-    # Heartbeat é alta frequência: não gera auditoria (apenas logs de aplicação).
     return AgentHeartbeatResponse(
         server_id=server.id,
         status=server.status,
         collection_interval_seconds=server.collection_interval_seconds,
+        received_at=now,
+    )
+
+
+@router.post(
+    "/metrics",
+    response_model=AgentMetricsResponse,
+    summary="Receber uma coleta de métricas do host",
+)
+def ingest_metrics(
+    payload: AgentMetricsRequest,
+    ctx: CurrentAgent,
+    db: DbSession,
+    _rate: AgentRateLimited,
+) -> AgentMetricsResponse:
+    now = utc_now()
+    try:
+        collected_at = telemetry_service.validate_collected_at(payload.collected_at, now=now)
+    except telemetry_service.FutureMetricError as exc:
+        raise BadRequestError(
+            "collected_at está no futuro além da tolerância",
+            details={"max_future_skew_seconds": 300},
+        ) from exc
+    except telemetry_service.StaleMetricError as exc:
+        raise BadRequestError(
+            "collected_at é antigo demais para ser armazenado",
+            details={"max_age_hours": 24},
+        ) from exc
+
+    outcome = telemetry_service.ingest_metrics(
+        db,
+        server=ctx.server,
+        payload=payload,
+        collected_at=collected_at,
+        now=now,
+    )
+    db.commit()
+
+    return AgentMetricsResponse(
+        server_id=ctx.server.id,
+        collected_at=collected_at,
+        recorded=outcome.recorded,
+        duplicate=outcome.duplicate,
+        disks_recorded=outcome.disks_recorded,
+        networks_recorded=outcome.networks_recorded,
         received_at=now,
     )
 
@@ -136,5 +190,5 @@ def get_config(ctx: CurrentAgent) -> AgentConfigResponse:
         server_name=server.name,
         collection_interval_seconds=server.collection_interval_seconds,
         heartbeat_timeout_seconds=server.heartbeat_timeout_seconds,
-        features=AgentFeatures(metrics=False, docker=False, checks=False),
+        features=AgentFeatures(metrics=True, docker=False, checks=False),
     )

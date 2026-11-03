@@ -1,0 +1,48 @@
+[Unit]
+Description=VPS Guardian Agent (coleta de métricas)
+Documentation=https://github.com/michaeljcfspb/vps-guardian
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=vps-guardian
+Group=vps-guardian
+ExecStart=/opt/vps-guardian/venv/bin/guardian-agent --config /etc/vps-guardian/agent.json
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+# --- Endurecimento (o agente só precisa de leitura do sistema e escrita no spool) ---
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+RemoveIPC=true
+UMask=0027
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Somente estes diretórios são graváveis pelo serviço.
+ReadWritePaths=/var/lib/vps-guardian /var/log/vps-guardian
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=guardian-agent
+
+[Install]
+WantedBy=multi-user.target
