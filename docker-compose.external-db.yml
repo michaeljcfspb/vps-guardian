@@ -53,6 +53,35 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: vps-guardian/frontend:0.1.0
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      # Destino de /api dentro do nginx. No Easypanel (App), use o nome do serviço da API.
+      API_UPSTREAM: ${API_UPSTREAM:-http://api:8000}
+    expose:
+      - "80"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1/ || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
   migrations:
     build:
       context: .

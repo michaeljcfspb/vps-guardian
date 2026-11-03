@@ -68,7 +68,9 @@ Detalhes em [`deploy/README.md`](deploy/README.md). O fluxo é:
    migrations automaticamente.
 3. Conferir `GET /health/ready` → `ready` com `schema_revision=0002_telemetry`.
 4. Criar o administrador: `docker compose exec api python -m app.cli create-admin ...`.
-5. Cadastrar a VPS, emitir o token e instalar o agente no host monitorado:
+5. Acessar o painel pelo domínio configurado (a rota `/` é o frontend; `/api` é
+   encaminhado pelo nginx para a API).
+6. Cadastrar a VPS, emitir o token e instalar o agente no host monitorado:
 
 ```bash
 sudo bash agent/scripts/install.sh \

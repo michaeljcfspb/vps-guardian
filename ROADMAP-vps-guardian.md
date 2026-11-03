@@ -429,19 +429,23 @@ explícita do piloto.
 
 ### Tarefas
 
--   [ ] Criar aplicação React + TypeScript.
--   [ ] Definir biblioteca de componentes e padrão visual.
--   [ ] Implementar login e sessão segura.
--   [ ] Criar dashboard com totais e estados.
--   [ ] Criar tabela de servidores.
--   [ ] Criar detalhe por servidor.
--   [ ] Criar gráficos de CPU, RAM, swap, disco e rede.
--   [ ] Criar indicadores de idade/atualidade dos dados.
--   [ ] Criar filtros por estado, tag e painel.
--   [ ] Criar visualização de incidentes e eventos.
--   [ ] Implementar paginação e consultas eficientes.
--   [ ] Implementar tratamento de loading, vazio e erro.
--   [ ] Testar layout desktop e mobile.
+-   [x] Criar aplicação React + TypeScript.
+-   [x] Definir biblioteca de componentes e padrão visual. — Tailwind 4 +
+    componentes próprios em `components/ui.tsx`
+-   [x] Implementar login e sessão segura. — cookie HttpOnly + CSRF
+-   [x] Criar dashboard com totais e estados.
+-   [x] Criar tabela de servidores.
+-   [x] Criar detalhe por servidor.
+-   [x] Criar gráficos de CPU, RAM, swap, disco e rede.
+-   [x] Criar indicadores de idade/atualidade dos dados.
+-   [-] Criar filtros por estado, tag e painel. — estado e busca prontos;
+    filtros por tag e painel pendentes
+-   [ ] Criar visualização de incidentes e eventos. — depende da fase 9
+-   [-] Implementar paginação e consultas eficientes. — agregação em SQL
+    pronta; paginação de UI pendente (limite 200)
+-   [x] Implementar tratamento de loading, vazio e erro.
+-   [-] Testar layout desktop e mobile. — responsivo implementado; falta
+    validar em dispositivo real
 
 ### Entregáveis
 
@@ -458,6 +462,10 @@ explícita do piloto.
 -   [ ] Gráficos consultam dados persistidos no MySQL.
 -   [ ] Filtros e paginação funcionam.
 -   [ ] Usuário sem sessão não acessa dados privados.
+
+> Situação em 03/11/2026: implementação concluída e build do frontend
+> validado, mas **nenhum critério acima foi executado com dados reais** —
+> dependem da instalação na VPS. Permanecem abertos.
 
 ------------------------------------------------------------------------
 
@@ -661,21 +669,21 @@ este bloco:
 
 ### Estado atual
 
--   **Fase atual:** 4 --- Agente Linux e telemetria (implementação concluída;
-    aceite em Ubuntu pendente).
--   **Última tarefa concluída:** Ingestão idempotente de telemetria
-    (`/agent/metrics`) e pacote do agente com serviço systemd.
--   **Próxima tarefa:** Fase 7 --- dashboard e histórico (recomendado antes
-    do piloto, para tornar a validação de 24 h observável) ou Fase 9 ---
-    motor de alertas.
+-   **Fase atual:** 7 --- Dashboard e histórico (implementação concluída;
+    validação visual pendente de dados reais).
+-   **Última tarefa concluída:** Painel React/TypeScript com login,
+    dashboard, detalhe por servidor, gráficos e ações administrativas.
+-   **Próxima tarefa:** Fase 8 --- Docker e verificações de disponibilidade,
+    ou Fase 9 --- motor de alertas.
 -   **Bloqueios:** MySQL do Easypanel, domínio/TLS, VPS central e
     inventário das nove VPS — os mesmos da Fase 0.
--   **Testes executados:** 66 testes de unidade no backend e 55 no agente,
-    lint (`ruff`) nos dois pacotes, DDL das duas migrations gerado por
-    `alembic upgrade head --sql`, OpenAPI com 20 rotas, coleta real via
-    `guardian-agent --dry-run`.
--   **Testes aprovados:** 121 de unidade. Os 46 de integração do backend
-    ficaram *skipped* por ausência de MySQL e **não** foram aprovados.
+-   **Testes executados:** 72 testes de unidade no backend e 55 no agente,
+    `ruff` nos dois pacotes, `pnpm build` (tsc + vite) do frontend,
+    DDL das duas migrations gerado por `alembic upgrade head --sql`,
+    OpenAPI com 24 rotas.
+-   **Testes aprovados:** 127 de unidade + build do frontend. Os 52 de
+    integração do backend ficaram *skipped* por ausência de MySQL e **não**
+    foram aprovados.
 -   **Data da última atualização:** 03/11/2026.
 
 ### Registro de execução
@@ -700,6 +708,10 @@ este bloco:
                                 + telemetria   (aceite em     fase-4.md;
                                 + migration    Ubuntu         121 testes de
                                 0002_telemetry pendente)      unidade ok
+
+  03/11/2026     7              Painel React   Implementado   docs/fases/
+                                + 4 endpoints  (visual na     fase-7.md;
+                                de leitura     VPS pendente)  build ok
 
   --------------------------------------------------------------------------
 

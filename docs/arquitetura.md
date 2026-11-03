@@ -74,8 +74,12 @@ Dois modos de implantação, ambos com migrations automáticas no boot:
 
 1. **Stack completo** (`docker-compose.yml`) — MySQL 8 no próprio compose, volume
    `mysql_data`, sem porta publicada. É o modo padrão e o mais rápido de subir.
-2. **MySQL do Easypanel** (`docker-compose.external-db.yml`) — apenas API e job de
+2. **MySQL do Easypanel** (`docker-compose.external-db.yml`) — API, painel e job de
    migrations, apontando para o banco gerenciado via rede privada.
+
+O painel (`guardian-frontend`) é servido por nginx e responde na mesma origem,
+encaminhando `/api` e `/health` para o `guardian-api`. Assim o cookie de sessão
+funciona sem CORS e a API não precisa ser exposta diretamente.
 
 O entrypoint da API executa `wait-db` e `alembic upgrade head` antes de iniciar o
 Uvicorn, garantindo que o schema exista antes da primeira requisição.

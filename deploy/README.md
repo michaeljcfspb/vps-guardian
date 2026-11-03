@@ -141,11 +141,18 @@ docker compose exec mysql \
   mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW TABLES FROM vps_guardian;"
 ```
 
-### 2.6 Expor a API com TLS
+### 2.6 Expor o painel com TLS
 
-No Easypanel, crie o domínio apontando para a porta interna **8000** do serviço `api`
-(o container publica apenas em `expose`, não em portas do host). O TLS é terminado pelo
-proxy do Easypanel (Let's Encrypt).
+No Easypanel, crie o domínio apontando para a porta interna **80** do serviço
+`frontend`. O nginx serve o painel e encaminha `/api` e `/health` para o serviço `api`
+(mesma origem, sem CORS). O TLS é terminado pelo proxy do Easypanel (Let's Encrypt).
+
+> Se preferir expor a API diretamente, aponte o domínio para `api:8000` — nesse caso o
+> painel precisa de `VITE_API_BASE_URL` e o backend precisa de `GUARDIAN_CORS_ORIGINS`.
+
+O nginx do painel recebe o destino da API pela variável `API_UPSTREAM`
+(padrão `http://api:8000`). Em uma instalação onde o serviço da API tem outro nome,
+defina `API_UPSTREAM=http://<nome-do-servico>:8000` no serviço `frontend`.
 
 Depois de definir o domínio, preencha no `.env`:
 

@@ -25,6 +25,7 @@ from app.core.errors import BadRequestError, ConflictError, NotFoundError
 from app.models.credential import ServerCredential
 from app.models.server import Server
 from app.schemas.common import Page
+from app.schemas.dashboard import HeartbeatRead, MetricsSeriesRead, MetricsWindow
 from app.schemas.server import (
     CredentialRead,
     ProvisioningTokenRead,
@@ -33,6 +34,7 @@ from app.schemas.server import (
     ServerRead,
     ServerUpdate,
 )
+from app.services import dashboard as dashboard_service
 from app.services import provisioning as provisioning_service
 from app.services import servers as server_service
 
@@ -304,3 +306,33 @@ def disable_server(
     )
     db.commit()
     return _to_read(server)
+
+
+@router.get(
+    "/{server_id}/metrics",
+    response_model=MetricsSeriesRead,
+    summary="Série histórica agregada de métricas",
+)
+def server_metrics(
+    server_id: str,
+    db: DbSession,
+    _user: CurrentUser,
+    window: Annotated[MetricsWindow, Query(description="1h, 6h, 24h ou 7d")] = "1h",
+) -> MetricsSeriesRead:
+    _get_or_404(db, server_id)
+    return dashboard_service.metrics_series(db, server_id=server_id, window=window)
+
+
+@router.get(
+    "/{server_id}/heartbeats",
+    response_model=list[HeartbeatRead],
+    summary="Histórico recente de heartbeat",
+)
+def server_heartbeats(
+    server_id: str,
+    db: DbSession,
+    _user: CurrentUser,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[HeartbeatRead]:
+    _get_or_404(db, server_id)
+    return dashboard_service.recent_heartbeats(db, server_id=server_id, limit=limit)

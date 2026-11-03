@@ -34,6 +34,21 @@ versionamento semântico.
   código de saída 2.
 - Entrypoint orienta explicitamente quando o MySQL não responde ou a migration falha.
 
+### Adicionado — Fase 7 (painel)
+
+- Frontend React 19 + TypeScript + Vite + Tailwind 4 + TanStack Query + Recharts.
+- Login com sessão por cookie HttpOnly e CSRF double-submit; nenhum token em
+  localStorage.
+- Dashboard com totais por estado, médias de CPU/RAM/disco, idade dos dados e tabela
+  de servidores.
+- Detalhe por servidor: KPIs, gráficos (CPU/RAM/swap/disco e rede) com janela
+  1h/6h/24h/7d, heartbeats recentes e ações administrativas (pausar, desativar,
+  token de provisionamento, rotação e revogação de credencial).
+- Novos endpoints de leitura: /dashboard/summary, /telemetry/latest,
+  /servers/{id}/metrics, /servers/{id}/heartbeats — agregação em SQL por bucket.
+- Imagem nginx multi-stage com SPA fallback e proxy /api na mesma origem
+  (sem CORS); serviço rontend nos dois composes.
+
 ### Adicionado — Fase 4 (agente e telemetria)
 
 - Migration `0002_telemetry`: `agent_heartbeats`, `host_metrics`, `disk_metrics`,
