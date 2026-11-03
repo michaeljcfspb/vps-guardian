@@ -32,6 +32,16 @@ interface RevealedSecret {
   title: string;
   value: string;
   hint?: string;
+  command?: string;
+}
+
+/** Base da API a partir do register_url (absoluto quando PUBLIC_BASE_URL está definido). */
+function resolveApiBase(registerUrl: string): string {
+  try {
+    return new URL(registerUrl, window.location.origin).origin;
+  } catch {
+    return window.location.origin;
+  }
 }
 
 export function ServerDetailPage() {
@@ -77,10 +87,17 @@ export function ServerDetailPage() {
   const issueToken = useMutation({
     mutationFn: () => api.provisioningToken(serverId),
     onSuccess: (data) => {
+      const apiBase = resolveApiBase(data.register_url);
       setSecret({
         title: "Token de provisionamento",
         value: data.token,
-        hint: `Uso único · expira em ${formatDateTime(data.expires_at)} · registre em ${data.register_url}`,
+        hint: `Uso único · expira em ${formatDateTime(data.expires_at)}`,
+        command: [
+          "sudo bash agent/scripts/install.sh \\",
+          `  --server-id ${data.server_id} \\`,
+          `  --token ${data.token} \\`,
+          `  --api-url ${apiBase}`,
+        ].join("\n"),
       });
     },
   });
@@ -320,6 +337,23 @@ export function ServerDetailPage() {
         <div className="space-y-3">
           <SecretBox label="Valor" value={secret?.value ?? ""} />
           {secret?.hint ? <p className="text-xs text-slate-400">{secret.hint}</p> : null}
+          {secret?.command ? (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Comando de instalação
+              </p>
+              <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-950/60 p-3 text-xs leading-relaxed text-slate-200">
+                {secret.command}
+              </pre>
+              <Button
+                variant="secondary"
+                className="mt-2"
+                onClick={() => void navigator.clipboard?.writeText(secret.command ?? "")}
+              >
+                Copiar comando
+              </Button>
+            </div>
+          ) : null}
         </div>
       </Modal>
 
